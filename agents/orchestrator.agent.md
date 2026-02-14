@@ -36,13 +36,72 @@
    - PR 本文に `Closes #XX` を必ず記載する（対象 Issue は plan.md の対応表を参照）
    - PR テンプレート（`.github/PULL_REQUEST_TEMPLATE.md`）に従う
 9. PR の CI を監視する（失敗時は修正→再プッシュ、最大3回）
-10. **release_manager** に最終判定を委譲する
-11. 人間の最終承認を得てからマージする
-12. マージ後の Issue / Project 検証（独立監査）
+10. Copilot コードレビュー対応ループ（最大3回）— 詳細は後述
+11. **release_manager** に最終判定を委譲する
+12. 人間の最終承認を得てからマージする
+13. マージ後の Issue / Project 検証（独立監査）
     - `issue-lifecycle` ワークフローが Issue を自動 Close したことを確認する
     - GitHub Projects で対象アイテムが「Done」に移動したことを確認する
     - `plan.md` の Done セクションに完了タスクが記載されていることを確認する
     - 不整合がある場合は手動で `gh issue close` / `gh project item-edit` で修正する
+
+## Step 10: Copilot コードレビュー対応ループ
+
+PR 作成後、CI 通過後に Copilot コードレビューの指摘を自動で取得・対応する。
+最大3回のイテレーションで以下を繰り返す。
+
+### 手順
+
+```
+review_iteration = 0
+while review_iteration < 3:
+    1. レビュー完了を待機する
+       - `gh pr checks <PR_NUMBER> --watch` で CI + レビュー status を監視
+       - CI が通過したら次のステップへ進む
+
+    2. レビューコメントを取得する
+       - `gh api repos/{owner}/{repo}/pulls/{pr}/reviews` で全レビューを取得
+       - `gh api repos/{owner}/{repo}/pulls/{pr}/comments` でインラインコメントを取得
+       - state が CHANGES_REQUESTED または COMMENTED のレビューを対象とする
+
+    3. 指摘を分類する
+       - copilot-code-review-instructions.md の基準に従い Must / Should / Nice に分類
+       - Must: マージ前に修正必須 → 修正対象
+       - Should: 強く推奨 → 修正対象（時間が許せば）
+       - Nice: 改善提案 → 今回はスキップ可
+
+    4. Must / Should の指摘がゼロなら → ループ終了
+       - レビューで approve 済み or 指摘なしなら Step 11 へ
+
+    5. 修正を実施する
+       - 各指摘の対象ファイル・行番号・提案内容を implementer に伝達
+       - implementer が修正を実施
+       - 修正後にローカル CI を再実行（失敗なら修正）
+
+    6. コミット・プッシュする
+       - コミットメッセージ: "fix: Copilot レビュー指摘対応 (iteration N)"
+       - プッシュにより自動で CI + Copilot 再レビューがトリガーされる
+
+    7. review_iteration++
+```
+
+### レビューコメント取得コマンド
+
+```bash
+# PR の全レビューを取得（著者・状態・本文）
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+  --jq '.[] | {author: .user.login, state: .state, body: .body}'
+
+# インラインコメント（ファイル・行番号・提案）を取得
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
+  --jq '.[] | {author: .user.login, path: .path, line: .line, body: .body, suggestion: .body | test("```suggestion")}'
+```
+
+### 注意事項
+
+- Copilot レビューが設定されていない場合（レビューが来ない場合）は30秒待機後にスキップする
+- レビュアーが Copilot 以外（人間）の場合は、指摘を表示して人間に判断を委ねる
+- 3回のイテレーションで解決しない場合は、残存指摘を一覧表示して人間に判断を委ねる
 
 ## 停止条件
 

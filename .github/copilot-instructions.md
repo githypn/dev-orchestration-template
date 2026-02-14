@@ -56,9 +56,14 @@
 8. コミット・プッシュし、PR を作成する（`gh pr create`）
    - PR 本文に `Closes #XX` を必ず記載する（plan.md の Issue 対応表を参照）
 9. PR の CI を監視する（失敗時は修正→再プッシュ、最大3回）
-10. release-manager に最終判定を委譲する
-11. **人間の最終承認を得てからマージする**（自動マージは禁止）
-12. マージ後の Issue/Project 検証（独立監査）
+10. Copilot コードレビュー対応ループ（最大3回）
+    - `gh api` でレビューコメントを取得し、Must/Should/Nice に分類する
+    - Must/Should 指摘があれば implementer に修正を委譲し、再プッシュする
+    - 再プッシュで Copilot 再レビューがトリガーされ、ループを繰り返す
+    - 指摘がゼロまたは approve 済みならループ終了
+11. release-manager に最終判定を委譲する
+12. **人間の最終承認を得てからマージする**（自動マージは禁止）
+13. マージ後の Issue/Project 検証（独立監査）
     - `issue-lifecycle` ワークフローが対象 Issue を自動 Close する
     - GitHub Projects のステータスが「Done」に自動更新される
     - plan.md の Done セクションとの整合性を確認する
