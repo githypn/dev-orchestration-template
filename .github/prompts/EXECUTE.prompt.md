@@ -1,23 +1,55 @@
-# EXECUTE — 実装プロンプト
+# EXECUTE — 自動実行プロンプト
 
 ## 目的
 
-`docs/plan.md` の Next にある指定タスクを実装する。
+`docs/plan.md` の Next にある先頭タスクを、ブランチ作成から PR 作成まで一貫して自動実行する。
+
+## 前提
+
+このプロンプトは Orchestrator エージェントの自動実行パイプラインと連動する。
+ユーザーの承認を待たず、以下の手順を最後まで実行する。
 
 ## 手順
 
-1. `docs/plan.md` の Next から対象タスクを確認する
-2. 対象タスクの受入条件（AC）を確認する
+### 1. 計画確認
+1. `docs/plan.md` の Next から先頭タスクを選択する
+2. 受入条件（AC）を確認する
 3. 関連する正本を読む：
    - `docs/requirements.md`（要件）
    - `docs/policies.md`（ポリシー）
    - `docs/constraints.md`（制約仕様）
    - `docs/architecture.md`（モジュール責務・依存ルール）
-4. 実装する
-5. テストを書く・通す
-6. CI を通す
-7. 必要なら docs を更新する
-8. PR を `.github/PULL_REQUEST_TEMPLATE.md` に従って作成する
+
+### 2. ブランチ作成
+4. `git checkout main && git pull origin main`
+5. `git checkout -b feat/<タスクID>-<説明>`
+
+### 3. 実装・テスト
+6. コードを実装する
+7. テストを書く・通す
+
+### 4. ローカル CI
+8. CI コマンドをすべて実行し、全て成功するまで修正する（最大3回）
+   - 具体的コマンドは `docs/runbook.md` を参照
+
+### 5. 監査（Orchestrator 経由）
+9. 3つの監査エージェントに監査を委譲
+10. Must 指摘がゼロになるまで修正ループ（最大3回）
+
+### 6. PR 作成
+11. `git add -A && git commit -m "<conventional commit>"`
+12. `git push -u origin HEAD`
+13. `gh pr create --title "<タスクID>: <説明>" --body "<PR テンプレートに従った本文>" --base main`
+14. PR 本文に検証手順と結果を記載する（AC-040）
+15. 関連 Issue を `Closes #XX` で紐付ける
+
+### 7. PR 検証
+16. `gh pr checks <PR番号> --watch` で CI 結果を確認
+17. 失敗時は修正→再プッシュ→再確認（最大3回）
+
+### 8. リリース判定
+18. release-manager に最終判定を委譲
+19. 人間の最終承認を得てからマージ
 
 ## チェックリスト
 
@@ -26,6 +58,8 @@
 - [ ] 秘密情報を含まない（P-002）
 - [ ] 制約を回避していない（P-003）
 - [ ] テストが追加・更新されている（AC-010）
-- [ ] CI が成功する（AC-020）
+- [ ] ローカル CI が成功する（AC-020）
 - [ ] 必要な docs が更新されている（AC-030）
 - [ ] PR に検証手順と結果が記載されている（AC-040）
+- [ ] PR の CI が成功する
+- [ ] 監査の Must 指摘がゼロである

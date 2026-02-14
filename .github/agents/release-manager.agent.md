@@ -3,6 +3,7 @@ name: release-manager
 description: リリース判定担当。全監査結果を統合し、受入条件（AC）をチェックして PR のマージ可否を判定する。コードは変更しない。
 tools:
   - read
+  - runInTerminal
   - search
 model: Claude Opus 4.6 (copilot)
 ---
