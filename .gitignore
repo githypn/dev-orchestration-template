@@ -43,7 +43,7 @@ bin/
 pkg/
 
 # IDE / エディタ
-.vscode/settings.json
+# .vscode/ はリポジトリにコミットする（Codespaces共通化のため）
 .idea/
 *.swp
 *.swo
