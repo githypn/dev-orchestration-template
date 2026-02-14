@@ -74,6 +74,30 @@
 - 修正ループが3回を超えた場合
 - plan.md の Next が空の場合
 
+## Plan Revision（計画修正モード）
+
+以下のトリガーフレーズでユーザーが指示した場合、計画修正パイプラインを実行する：
+
+- 「計画を修正して」「計画を見直して」「新しい要件を追加して」「Issue を追加して」「Backlog に追加して」「計画を更新して」
+
+### 計画修正パイプラインの概要
+
+1. ユーザーから新要件・変更内容をヒアリングする
+2. 影響範囲を評価する（既存 Phase への追加 or 新 Phase 作成）
+3. `docs/plan.md` を更新する（Backlog/Next 追加、ロードマップ調整、変更履歴記録）
+4. GitHub Issues を作成する（`gh issue create`）
+5. Issues を GitHub Project に追加する（`gh project item-add`）
+6. Project フィールドを設定する（Status / Type / Phase）
+7. `plan.md` の Issue 対応表を更新する
+8. Next の調整（空きがあれば昇格、なければ Backlog に留置）
+9. 変更をコミット・プッシュする（main に直接、計画文書のため PR 不要）
+
+### 注意事項
+
+- 自動実行パイプライン実行中に計画修正は行わない（完了後に修正する）
+- Issue 対応表と GitHub Issues / Project の整合性を常に維持する
+- 既存タスクの変更・削除は Issue の更新・Close も合わせて行う
+
 ## Issue Lifecycle（Issue / Project 連動）
 
 - PR 本文には必ず `Closes #XX` を記載し、完了する Issue を明示する。

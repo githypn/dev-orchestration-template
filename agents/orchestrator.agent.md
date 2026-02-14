@@ -10,6 +10,11 @@
 以下のトリガーフレーズで自動実行パイプラインを開始する（承認確認不要）：
 - 「計画に従い作業を実施して」「Nextを実行して」「plan.md に従って進めて」「作業を開始して」「タスクを実行して」
 
+## 計画修正トリガー
+
+以下のトリガーフレーズで計画修正パイプラインを開始する：
+- 「計画を修正して」「計画を見直して」「新しい要件を追加して」「Issue を追加して」「Backlog に追加して」「計画を更新して」
+
 ## 参照する正本
 
 - `docs/plan.md`（現在の計画・Next タスク）
@@ -132,3 +137,106 @@ PR を作成する際、完了する Issue を PR 本文に明記する：
 - 複数 Issue がある場合は `Closes #XX, Closes #YY` と列挙する
 - `issue-lifecycle` ワークフローが自動で plan.md 整合性を監査し、Issue を Close する
 - GitHub Projects の built-in ワークフローが Issue Close 時にステータスを「Done」に自動更新する
+
+## 計画修正パイプライン（Plan Revision）
+
+プロジェクト進行中に新しい要件・タスクが発生した場合、以下の手順で計画を修正する。
+このパイプラインは計画修正トリガーフレーズで起動するか、人間が直接指示した場合に実行する。
+
+### 前提
+
+- 計画修正は正本（`docs/plan.md`）を唯一の情報源として扱う
+- 修正後も plan.md の運用ルール（Next 最大3件、Backlog は自動着手しない等）を遵守する
+- Issue / Project の整合性を必ず維持する
+
+### 手順
+
+```
+1. 要件のヒアリングと整理
+   - ユーザーから新要件・変更内容を受け取る
+   - 既存の要件（docs/requirements.md）との関係を確認する
+   - タスクの粒度を Story レベルに分解する（必要に応じて Epic も作成）
+
+2. 影響範囲の評価
+   - 既存 Phase への追加か、新 Phase の作成か判断する
+   - 既存タスクとの依存関係を確認する
+   - Next に空きがある場合は直接 Next に追加可能か判断する
+   - ロードマップの変更が必要か判断する
+
+3. docs/plan.md を更新する
+   a. ロードマップの更新（新 Phase や期間変更がある場合）
+   b. Backlog にタスクを追加する（タスク ID は B-XXX 形式）
+      - Next に直接追加する場合は N-XXX 形式
+   c. 今月のゴールの更新（必要に応じて）
+   d. 変更履歴に修正内容を記録する
+
+4. GitHub Issues を作成する
+   gh issue create --title "<タスクタイトル>" \
+     --body "<タスク説明（受入条件を含む）>" \
+     --label "<ラベル>"
+
+5. Issues を GitHub Project に追加する
+   gh project item-add <PROJECT_NUMBER> --owner <OWNER> \
+     --url <ISSUE_URL>
+
+6. Project フィールドを設定する（GraphQL API）
+   # アイテム ID を取得する
+   gh api graphql -f query='
+     query {
+       user(login: "<OWNER>") {
+         projectV2(number: <PROJECT_NUMBER>) {
+           items(last: 10) {
+             nodes { id content { ... on Issue { number } } }
+           }
+         }
+       }
+     }' --jq '.data.user.projectV2.items.nodes[] | select(.content.number == <ISSUE_NUMBER>) | .id'
+
+   # Status / Type / Phase フィールドを設定する
+   gh api graphql -f query='
+     mutation {
+       updateProjectV2ItemFieldValue(input: {
+         projectId: "<PROJECT_ID>"
+         itemId: "<ITEM_ID>"
+         fieldId: "<FIELD_ID>"
+         value: { singleSelectOptionId: "<OPTION_ID>" }
+       }) { projectV2Item { id } }
+     }'
+
+7. plan.md の Issue 対応表を更新する
+   - 新規作成した Issue 番号をタスクに紐づけて対応表に追加する
+
+8. Next の調整（必要に応じて）
+   - Next に空きがあり、優先度が高い場合：Backlog から Next に昇格する
+   - Next が満杯の場合：Backlog に留めて人間の判断を仰ぐ
+   - Project の Status を "In Progress"（Next の場合）または "Todo"（Backlog の場合）に設定する
+
+9. 変更をコミット・プッシュする
+   - 対象ファイル：docs/plan.md（必須）、docs/requirements.md（要件変更がある場合）
+   - コミットメッセージ：「docs: 計画修正 — <変更概要>」
+   - main ブランチに直接コミットする（計画文書の更新のため PR 不要）
+```
+
+### 複数タスク一括追加の場合
+
+複数のタスクを一度に追加する場合は、手順4〜7をタスクごとに繰り返す。
+Issue の一括作成には以下のパターンを使用する：
+
+```bash
+# 複数 Issue を連続作成する
+for task in "タスク1" "タスク2" "タスク3"; do
+  gh issue create --title "$task" --body "..." --label "enhancement"
+done
+```
+
+### 既存タスクの変更・削除
+
+- タスクの内容変更：plan.md の該当タスクを更新し、対応 Issue も `gh issue edit` で更新する
+- タスクの削除/中止：plan.md から削除し、Issue を `gh issue close --reason "not planned"` で Close する
+- Phase の変更：plan.md のロードマップと対応表を更新し、Project の Phase フィールドも更新する
+
+### 注意事項
+
+- Issue 番号は plan.md の対応表と常に一致させる（不整合を作らない）
+- 自動実行パイプライン実行中に計画修正は行わない（完了後に修正する）
+- ポリシー・制約に関わる変更は、先に docs/policies.md や docs/constraints.md を更新する
