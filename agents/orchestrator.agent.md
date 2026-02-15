@@ -32,6 +32,10 @@
    - **implementer**: 実装（即座に着手）
    - **test_engineer**: テスト作成（即座に着手）
 5. ローカル CI を実行する（失敗時は修正指示→再実行、最大3回）
+   - **重要**: 型チェックのスコープにはテストファイルも必ず含める
+5.5. 全体エラー検証（ゲートチェック）
+   - get_errors ツールでワークスペース全体のコンパイルエラー・型エラーを取得する
+   - **エラーがゼロになるまで監査ステップに進まない**
 6. 3つの監査エージェントに監査を委譲する：
    - **auditor_spec**: 仕様監査
    - **auditor_security**: セキュリティ監査
@@ -55,19 +59,26 @@
 PR 作成後、CI 通過後に Copilot コードレビューの指摘を自動で取得・対応・返信する。
 最大3回のイテレーションで以下を繰り返す。
 
+### 重要：再レビュー検出の仕組み
+
+Copilot の再レビューを正しく検出するには、**リクエスト前後のレビュー数を比較**する必要がある。
+直前のレビュー state（CHANGES_REQUESTED 等）を見るだけでは、**古いレビューを新しいレビューと誤認**する。
+これが「再レビューを待っているのに即座に完了扱いになる」バグの原因である。
+
 ### 手順
 
 ```
 review_iteration = 0
 while review_iteration < 3:
     1. レビュー完了を待機する
-       - `gh pr checks <PR_NUMBER> --watch` で CI + レビュー status を監視
+       - 初回は `gh pr checks <PR_NUMBER> --watch` で CI + レビュー status を監視
+       - 2回目以降は「再レビューリクエストと待機手順」（後述）で新レビューを待機する
        - CI が通過したら次のステップへ進む
 
     2. レビューコメントを取得する
        - `gh api repos/{owner}/{repo}/pulls/{pr}/reviews` で全レビューを取得
        - `gh api repos/{owner}/{repo}/pulls/{pr}/comments` でインラインコメントを取得
-       - state が CHANGES_REQUESTED または COMMENTED のレビューを対象とする
+       - 2回目以降は、前回のイテレーション以降に追加された新しいレビュー/コメントのみを対象とする
        - 自分の返信済みコメントを除外し、未対応コメントのみ抽出する
 
     3. 指摘を分類する
@@ -91,10 +102,68 @@ while review_iteration < 3:
 
     7. コミット・プッシュする
        - コミットメッセージ: "fix: Copilot レビュー指摘対応 (iteration N)"
-       - プッシュにより自動で CI + Copilot 再レビューがトリガーされる
+       - プッシュにより CI が自動トリガーされる
 
-    8. review_iteration++
+    8. Copilot レビューを再リクエストし、新しいレビューを待機する
+       - 「再レビューリクエストと待機手順」に従う（後述）
+       - **タイムアウトした場合は「指摘なし」と判定せず、ユーザーに報告して停止する**
+
+    9. 新しいレビューが届いたらステップ 2 に戻る
+
+    10. review_iteration++
 ```
+
+### 再レビューリクエストと待機手順（最重要）
+
+以下の手順を**正確に**実行する。手順の省略や短縮は禁止する。
+
+**禁止事項**:
+- 直前のレビューの `state` だけを見て新しいレビューの到着を判定すること（古いレビューを誤認する）
+- タイムアウト後に「指摘はすべて対処済み」「新しい指摘なし」と自動判定すること
+- 60秒未満のタイムアウトで待機を打ち切ること
+
+```bash
+# (a) リクエスト前のレビュー数を記録する
+BEFORE_COUNT=$(gh api "repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
+  --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | length')
+echo "現在の Copilot レビュー数: $BEFORE_COUNT"
+
+# (b) レビューを正式にリクエストする（2つの方法を両方実行する）
+gh api "repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers" \
+  --method POST -f 'reviewers[]=copilot-pull-request-reviewer' 2>/dev/null || true
+gh pr edit {pr_number} --add-reviewer "copilot-pull-request-reviewer" 2>/dev/null || true
+
+# (c) 新しいレビューが届くまで最大 5 分間ポーリングする（30秒間隔 × 10回）
+REVIEW_RECEIVED=false
+for i in $(seq 1 10); do
+  sleep 30
+  CURRENT_COUNT=$(gh api "repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | length')
+  echo "待機中... ($i/10, レビュー数: $BEFORE_COUNT → $CURRENT_COUNT)"
+  if [ "$CURRENT_COUNT" -gt "$BEFORE_COUNT" ]; then
+    REVIEW_RECEIVED=true
+    echo "✅ 新しい Copilot レビューを検出しました"
+    break
+  fi
+done
+
+# (d) タイムアウト判定
+if [ "$REVIEW_RECEIVED" = "false" ]; then
+  echo "⚠️ Copilot 再レビューが 5 分以内に届きませんでした"
+  echo "手動で PR ページを確認してください: $(gh pr view {pr_number} --json url -q .url)"
+  # → パイプラインを一時停止し、ユーザーに報告する
+fi
+```
+
+#### タイムアウト時の対応（必須遵守）
+
+再レビューが 5 分以内に届かなかった場合、以下の対応を取る：
+
+1. **ユーザーに報告して判断を仰ぐ**（推奨）
+2. **追加待機**：さらに 5 分待機する（合計 10 分まで。10分を超えて待機しない）
+3. **PR URL を提示して手動確認を依頼する**
+
+**絶対に禁止**: タイムアウト後に「指摘はすべて対処済み」「新しい指摘なし」と自動判定して先に進むこと。
 
 ### レビューコメント取得コマンド
 
@@ -132,7 +201,9 @@ gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
 
 ### 注意事項
 
-- Copilot レビューが設定されていない場合（レビューが来ない場合）は30秒待機後にスキップする
+- Copilot レビューが設定されていない場合（初回レビューが60秒以内に来ない場合）はスキップ可
+- **再レビュー待機では必ず「再レビューリクエストと待機手順」に従い、レビュー数の増減で判定する**
+- **`state` の値だけで判定しない**（古いレビューの state を誤認するため）
 - レビュアーが Copilot 以外（人間）の場合は、指摘を表示して人間に判断を委ねる
 - 3回のイテレーションで解決しない場合は、残存指摘を一覧表示して人間に判断を委ねる
 - 全てのレビューコメントには必ず返信する（未返信のコメントを残さない）

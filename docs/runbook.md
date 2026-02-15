@@ -56,9 +56,15 @@ cp .env.example .env
 # フォーマッタ（チェックのみ）
 {{RUN_PREFIX}} {{FORMATTER}}
 
-# 型チェック
+# 型チェック（テストディレクトリも含める）
 {{RUN_PREFIX}} {{TYPE_CHECKER}}
+# ⚠️ 型チェックのスコープにテストディレクトリを必ず含めること
 ```
+
+### IDE エラー検証（ゲートチェック）
+
+CI の静的解析に加えて、IDE（Pylance 等）のエラーもゼロであることを確認する。
+Copilot エージェントの場合は `get_errors` ツール（filePaths 省略）でワークスペース全体を検査する。
 
 ### テスト
 
@@ -99,4 +105,8 @@ cp .env.example .env
 
 1. ロックファイルを削除して再インストール
 2. CI で動作確認する
+
+## モバイルでの開発
+
+iPhone / iPad からの開発作業については [docs/mobile-workflow.md](mobile-workflow.md) を参照する。
 ````

@@ -82,7 +82,25 @@ handoffs:
 ### Step 4: ローカル CI 実行
 
 7. CI を自ら実行し結果を確認する（具体的コマンドは `docs/runbook.md` を参照）
+   **重要**: 型チェックのスコープにはテストファイルも必ず含める（例: `uv run mypy src/ tests/ ci/`）。
+   テストファイルの型エラーを見逃さないためである。
 8. **失敗した場合** → implementer にエラー内容を渡して修正を指示し、Step 4 を再実行する（最大3回）
+
+### Step 4.5: 全体エラー検証（ゲートチェック）
+
+Step 4 通過後、監査に入る前に以下の全体エラー検証を実施する。
+このステップは **CI では検出できないが IDE（Pylance strict モード）で検出されるエラー** を捕捉するためのものである。
+
+9. get_errors ツール（ファイルパス指定なし）でワークスペース全体のコンパイルエラー・型エラーを取得する
+10. エラーが **1件以上** ある場合：
+    - エラー内容を一覧化し、implementer に修正を指示する
+    - 修正後、Step 4 の CI を再実行する
+    - **エラーがゼロになるまで Step 5 に進まない**
+11. エラーが **ゼロ** であることを確認したら、監査ステップに進む
+
+**補足**: CI ツールと IDE ツールは検出範囲が異なる。
+CI が通過しても IDE で型エラーが残ることがある。
+両方でエラーゼロを確認することで、マージ後にエラーが残存する事態を防ぐ。
 
 ### Step 5: 監査委譲
 
@@ -142,39 +160,138 @@ handoffs:
 PR 作成・CI通過後に Copilot コードレビューの指摘を自動で取得・対応・返信する。
 最大3回のイテレーションで以下を繰り返す。
 
-17. レビューコメントを取得する：
-    ```bash
-    gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
-      --jq '.[] | {id: .id, author: .user.login, path: .path, line: .line, body: .body, in_reply_to_id: .in_reply_to_id}'
-    ```
-18. 指摘を Must / Should / Nice に分類する
-19. Must / Should 指摘があれば implementer に修正を委譲する
-20. 各レビューコメントに返信する：
-    ```bash
-    gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
-      -f body="対応しました。<修正内容の説明>（<コミットハッシュ>）。"
-    ```
-    返信テンプレート：
-    - **修正済み**: 「対応しました。<具体的な修正内容>（<コミットハッシュ>）。」
-    - **Nice でスキップ**: 「ご指摘ありがとうございます。改善提案として認識しました。今回のスコープ外のため次回以降で検討します。」
-    - **対応不要と判断**: 「ご指摘ありがとうございます。<対応不要と判断した技術的理由>。」
-21. 修正をコミット・プッシュする（CI が自動トリガーされる）
-22. **Copilot レビューを再リクエストする**：
-    ```bash
-    gh pr edit <PR_NUMBER> --add-reviewer "copilot-pull-request-reviewer"
-    ```
-    レビューが返ってくるまで最大60秒待機する（`sleep 10` × 6回でポーリング）：
-    ```bash
-    for i in $(seq 1 6); do
-      sleep 10
-      REVIEW_STATE=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-        --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | last | .state // "PENDING"')
-      if [ "$REVIEW_STATE" != "PENDING" ]; then break; fi
-    done
-    ```
-23. 指摘がゼロまたは approve 済みならループ終了
-    - 全てのレビューコメントには必ず返信する（未返信のコメントを残さない）
-    - **再プッシュ後は必ず `gh pr edit --add-reviewer` で Copilot を再リクエストする**（自動トリガーに依存しない）
+#### 重要：再レビュー検出の仕組み
+
+Copilot の再レビューを正しく検出するには、**リクエスト前後のレビュー数を比較**する必要がある。
+直前のレビュー state（CHANGES_REQUESTED 等）を見るだけでは、**古いレビューを新しいレビューと誤認**する。
+これが「再レビューを待っているのに即座に完了扱いになる」バグの原因である。
+
+```
+review_iteration = 0
+while review_iteration < 3:
+    1. レビュー完了を待機する
+       - 初回は `gh pr checks <PR_NUMBER> --watch` で CI + レビュー status を監視
+       - 2回目以降は「再レビューリクエストと待機手順」（後述）で新レビューを待機する
+       - CI が通過したら次のステップへ進む
+
+    2. レビューコメントを取得する
+       - `gh api repos/{owner}/{repo}/pulls/{pr}/reviews` で全レビューを取得
+       - `gh api repos/{owner}/{repo}/pulls/{pr}/comments` でインラインコメントを取得
+       - 2回目以降は、前回のイテレーション以降に追加された新しいレビュー/コメントのみを対象とする
+       - 自分の返信済みコメントを除外し、未対応コメントのみ抽出する
+
+    3. 指摘を分類する
+       - Must: マージ前に修正必須 → 修正対象
+       - Should: 強く推奨 → 修正対象（時間が許せば）
+       - Nice: 改善提案 → 今回はスキップ可
+
+    4. Must / Should の指摘がゼロなら → ループ終了
+
+    5. 修正を実施する
+       - 各指摘の対象ファイル・行番号・提案内容を implementer に伝達
+       - 修正後にローカル CI を再実行（失敗なら修正）
+
+    6. 各レビューコメントに返信する
+
+    7. コミット・プッシュする
+       - コミットメッセージ: "fix: Copilot レビュー指摘対応 (iteration N)"
+       - プッシュにより CI が自動トリガーされる
+
+    8. Copilot レビューを再リクエストし、新しいレビューを待機する
+       - 「再レビューリクエストと待機手順」に従う（後述）
+       - **タイムアウトした場合は「指摘なし」と判定せず、ユーザーに報告して停止する**
+
+    9. 新しいレビューが届いたらステップ 2 に戻る
+
+    10. review_iteration++
+```
+
+#### 再レビューリクエストと待機手順（最重要）
+
+以下の手順を**正確に**実行する。手順の省略や短縮は禁止する。
+
+**禁止事項**:
+- 直前のレビューの `state` だけを見て新しいレビューの到着を判定すること（古いレビューを誤認する）
+- タイムアウト後に「指摘はすべて対処済み」「新しい指摘なし」と自動判定すること
+- 60秒未満のタイムアウトで待機を打ち切ること
+
+```bash
+# (a) リクエスト前のレビュー数を記録する
+BEFORE_COUNT=$(gh api "repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
+  --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | length')
+echo "現在の Copilot レビュー数: $BEFORE_COUNT"
+
+# (b) レビューを正式にリクエストする（2つの方法を両方実行する）
+gh api "repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers" \
+  --method POST -f 'reviewers[]=copilot-pull-request-reviewer' 2>/dev/null || true
+gh pr edit {pr_number} --add-reviewer "copilot-pull-request-reviewer" 2>/dev/null || true
+
+# (c) 新しいレビューが届くまで最大 5 分間ポーリングする（30秒間隔 × 10回）
+REVIEW_RECEIVED=false
+for i in $(seq 1 10); do
+  sleep 30
+  CURRENT_COUNT=$(gh api "repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | length')
+  echo "待機中... ($i/10, レビュー数: $BEFORE_COUNT → $CURRENT_COUNT)"
+  if [ "$CURRENT_COUNT" -gt "$BEFORE_COUNT" ]; then
+    REVIEW_RECEIVED=true
+    echo "✅ 新しい Copilot レビューを検出しました"
+    break
+  fi
+done
+
+# (d) タイムアウト判定
+if [ "$REVIEW_RECEIVED" = "false" ]; then
+  echo "⚠️ Copilot 再レビューが 5 分以内に届きませんでした"
+  echo "手動で PR ページを確認してください: $(gh pr view {pr_number} --json url -q .url)"
+  # → パイプラインを一時停止し、ユーザーに報告する
+fi
+```
+
+##### タイムアウト時の対応（必須遵守）
+
+再レビューが 5 分以内に届かなかった場合、以下の対応を取る：
+
+1. **ユーザーに報告して判断を仰ぐ**（推奨）
+2. **追加待機**：さらに 5 分待機する（合計 10 分まで。10分を超えて待機しない）
+3. **PR URL を提示して手動確認を依頼する**
+
+**絶対に禁止**: タイムアウト後に「指摘はすべて対処済み」「新しい指摘なし」と自動判定して先に進むこと。
+
+#### レビューコメント取得コマンド
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+  --jq '.[] | {author: .user.login, state: .state, body: .body}'
+
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
+  --jq '.[] | {author: .user.login, path: .path, line: .line, body: .body, id: .id, in_reply_to_id: .in_reply_to_id}'
+
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
+  --jq '[.[] | select(.in_reply_to_id == null)] | map({id, author: .user.login, path, line, body})'
+```
+
+#### レビューコメント返信コマンド
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+  -f body="対応しました。<修正内容の説明>（<コミットハッシュ>）。"
+```
+
+#### 返信テンプレート
+
+- **修正済み**: 「対応しました。<具体的な修正内容>（<コミットハッシュ>）。」
+- **Nice でスキップ**: 「ご指摘ありがとうございます。改善提案として認識しました。今回のスコープ外のため次回以降で検討します。」
+- **対応不要と判断**: 「ご指摘ありがとうございます。<対応不要と判断した技術的理由>。」
+
+#### 注意事項
+
+- Copilot レビューが設定されていない場合（初回レビューが60秒以内に来ない場合）はスキップ可
+- **再レビュー待機では必ず「再レビューリクエストと待機手順」に従い、レビュー数の増減で判定する**
+- **`state` の値だけで判定しない**（古いレビューの state を誤認するため）
+- レビュアーが Copilot 以外（人間）の場合は、指摘を表示して人間に判断を委ねる
+- 3回のイテレーションで解決しない場合は、残存指摘を一覧表示して人間に判断を委ねる
+- 全てのレビューコメントには必ず返信する（未返信のコメントを残さない）
 
 ### Step 10: リリース判定
 
