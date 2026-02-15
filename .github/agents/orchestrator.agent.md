@@ -108,12 +108,20 @@ handoffs:
     git commit -m "<conventional commit メッセージ>"
     git push -u origin HEAD
     ```
-14. PR を作成する：
+14. PR を作成する（**`--body-file` を使用**し、Markdown が正しくレンダリングされるようにする）：
     ```bash
+    # PR 本文を一時ファイルに書き出す（改行が正しく保持される）
+    cat > /tmp/pr_body.md << 'PRBODY'
+    <.github/PULL_REQUEST_TEMPLATE.md に従った本文をここに記載>
+    PRBODY
     gh pr create --title "<タスクID>: <説明>" \
-      --body "<.github/PULL_REQUEST_TEMPLATE.md に従った本文>" \
+      --body-file /tmp/pr_body.md \
       --base main
+    rm -f /tmp/pr_body.md
     ```
+
+    **重要**: `--body` オプションでインライン文字列を渡すと `\n` がリテラル文字として送信され、Markdown のレイアウトが崩壊する。必ず `--body-file` で一時ファイル経由で渡すこと。
+
     - PR 本文には検証手順と結果を含める（AC-040）
     - 関連 Issue 番号を `Closes #XX` で紐付ける
 
@@ -150,9 +158,23 @@ PR 作成・CI通過後に Copilot コードレビューの指摘を自動で取
     - **修正済み**: 「対応しました。<具体的な修正内容>（<コミットハッシュ>）。」
     - **Nice でスキップ**: 「ご指摘ありがとうございます。改善提案として認識しました。今回のスコープ外のため次回以降で検討します。」
     - **対応不要と判断**: 「ご指摘ありがとうございます。<対応不要と判断した技術的理由>。」
-21. 修正をコミット・プッシュする（再レビューが自動トリガーされる）
-22. 指摘がゼロまたは approve 済みならループ終了
+21. 修正をコミット・プッシュする（CI が自動トリガーされる）
+22. **Copilot レビューを再リクエストする**：
+    ```bash
+    gh pr edit <PR_NUMBER> --add-reviewer "copilot-pull-request-reviewer"
+    ```
+    レビューが返ってくるまで最大60秒待機する（`sleep 10` × 6回でポーリング）：
+    ```bash
+    for i in $(seq 1 6); do
+      sleep 10
+      REVIEW_STATE=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+        --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | last | .state // "PENDING"')
+      if [ "$REVIEW_STATE" != "PENDING" ]; then break; fi
+    done
+    ```
+23. 指摘がゼロまたは approve 済みならループ終了
     - 全てのレビューコメントには必ず返信する（未返信のコメントを残さない）
+    - **再プッシュ後は必ず `gh pr edit --add-reviewer` で Copilot を再リクエストする**（自動トリガーに依存しない）
 
 ### Step 10: リリース判定
 

@@ -54,13 +54,14 @@
 6. 3つの監査エージェントに監査を委譲する
 7. Must 指摘が残れば修正ループ（最大3回）
 8. コミット・プッシュし、PR を作成する（`gh pr create`）
+   - PR 本文は必ず `--body-file` で一時ファイル経由で渡す（`--body` は使用禁止。`\n` がリテラル文字として送信され、Markdown が崩壊する）
    - PR 本文に `Closes #XX` を必ず記載する（plan.md の Issue 対応表を参照）
 9. PR の CI を監視する（失敗時は修正→再プッシュ、最大3回）
 10. Copilot コードレビュー対応ループ（最大3回）
     - `gh api` でレビューコメントを取得し、Must/Should/Nice に分類する
     - Must/Should 指摘があれば implementer に修正を委譲し、再プッシュする
     - 各レビューコメントに対応結果を `gh api .../comments/{id}/replies` で返信する
-    - 再プッシュで Copilot 再レビューがトリガーされ、ループを繰り返す
+    - **再プッシュ後は `gh pr edit --add-reviewer "copilot-pull-request-reviewer"` で Copilot レビューを明示的に再リクエストする**（自動トリガーに依存しない）
     - 指摘がゼロまたは approve 済みならループ終了
 11. release-manager に最終判定を委譲する
 12. **人間の最終承認を得てからマージする**（自動マージは禁止）

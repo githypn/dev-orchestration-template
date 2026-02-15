@@ -39,7 +39,17 @@
 ### 6. PR 作成
 11. `git add -A && git commit -m "<conventional commit>"`
 12. `git push -u origin HEAD`
-13. `gh pr create --title "<タスクID>: <説明>" --body "<PR テンプレートに従った本文>" --base main`
+13. PR 本文を一時ファイルに書き出し、`--body-file` で渡す（**`--body` は使わない**）：
+    ```bash
+    cat > /tmp/pr_body.md << 'PRBODY'
+    <.github/PULL_REQUEST_TEMPLATE.md に従った本文をここに記載>
+    PRBODY
+    gh pr create --title "<タスクID>: <説明>" \
+      --body-file /tmp/pr_body.md \
+      --base main
+    rm -f /tmp/pr_body.md
+    ```
+    **重要**: `--body` でインライン文字列を渡すと `\n` がリテラル文字として送信され、Markdown のレイアウトが崩壊する。
 14. PR 本文に検証手順と結果を記載する（AC-040）
 15. 関連 Issue を `Closes #XX` で紐付ける
 
