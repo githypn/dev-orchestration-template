@@ -97,3 +97,22 @@ github:
     - { name: "plan:mid-term", color: "c2e0c6", description: "中期計画" }
     - { name: "plan:long-term", color: "fef2c0", description: "長期計画" }
   project_name: "開発ロードマップ"
+
+# --- AI モデル設定 ---
+# オーケストレーション（エージェントパイプライン）で使用する AI モデルの設定。
+# 変更後に `scripts/update_agent_models.sh` を実行すると各エージェントファイルに反映される。
+# モデルの指定値は VS Code Copilot Chat のモデル選択ドロップダウンに表示される名称を使用する。
+ai_models:
+  # 全エージェント共通のデフォルトモデル
+  default: "Claude Opus 4.6 (copilot)"
+
+  # エージェントごとに異なるモデルを使いたい場合に個別指定する（任意）
+  # 未指定のエージェントは default が適用される
+  overrides:
+    # orchestrator: "Claude Opus 4.6 (copilot)"
+    # implementer: "Claude Sonnet 4.5 (copilot)"
+    # test_engineer: "Claude Sonnet 4.5 (copilot)"
+    # auditor_spec: "Claude Sonnet 4.5 (copilot)"
+    # auditor_security: "Claude Sonnet 4.5 (copilot)"
+    # auditor_reliability: "Claude Sonnet 4.5 (copilot)"
+    # release_manager: "Claude Sonnet 4.5 (copilot)"
