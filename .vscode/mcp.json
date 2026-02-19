@@ -3,13 +3,16 @@
 		"serena": {
 			"command": "uvx",
 			"args": [
-				"serena-mcp",
-				"--project-root",
+				"--from",
+				"git+https://github.com/oraios/serena",
+				"serena",
+				"start-mcp-server",
+				"--context",
+				"ide-assistant",
+				"--project",
 				"${workspaceFolder}"
 			],
-			"env": {
-				"SERENA_DISABLE_SHELL": "true"
-			}
+			"type": "stdio"
 		}
 	}
 }
