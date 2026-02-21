@@ -84,9 +84,9 @@ class TestProcessProperties:
         else:
             assert r1 >= r2
 
-    @given(value=valid_values, multiplier=valid_multipliers)
+    @given(multiplier=valid_multipliers)
     @settings(max_examples=200)
-    def test_zero_value_yields_zero(self, value: float, multiplier: float) -> None:
+    def test_zero_value_yields_zero(self, multiplier: float) -> None:
         """ゼロ入力のテスト: value=0.0 の場合、結果は常に 0.0 であること。"""
         entity = ExampleEntity(name="test", value=0.0)
         result = process(entity, multiplier)

@@ -27,14 +27,17 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       # ---------------------------------------------------------------
       # 言語セットアップ（プロジェクトに合わせて1つ選択）
       # ---------------------------------------------------------------
+      # 注意: サードパーティ Action は本番利用時に必ずコミットハッシュで
+      # 固定すること（タグ指定は禁止）。以下のコメントアウト例はタグ指定
+      # のままであるため、利用時にハッシュに置換する必要がある。
 
       # --- Python ---
-      # - uses: actions/setup-python@v5
+      # - uses: actions/setup-python@v5  # → コミットハッシュに置換すること
       #   with:
       #     python-version: "3.11"
       # - name: Install uv

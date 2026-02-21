@@ -46,18 +46,17 @@ _TRACER_NAME = "{{TRACER_NAME}}"
 
 _HAS_OTEL = False
 
+# fmt: off
 try:
     from opentelemetry import trace  # type: ignore[import-not-found]
     from opentelemetry.sdk.resources import Resource  # type: ignore[import-not-found]
     from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]
-    from opentelemetry.sdk.trace.export import (  # type: ignore[import-not-found]
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-    )
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter  # type: ignore[import-not-found]
 
     _HAS_OTEL = True
 except ImportError:
     pass
+# fmt: on
 
 
 # ---------------------------------------------------------------------------

@@ -78,6 +78,7 @@ URL_ALLOWLIST_PATTERNS: list[str] = [
     r"schemas\.openapi",
     r"json-schema\.org",
     r"astral\.sh",
+    r"opentelemetry\.io",
 ]
 
 # 禁止操作パターン（言語非依存、全ファイルに適用）
