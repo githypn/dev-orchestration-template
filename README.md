@@ -203,6 +203,21 @@ FORBIDDEN_PATTERNS = [
 
 `docs/constraints.md` に制約を定義し、テストで境界値をカバーする。
 
+## プロトコル標準
+
+### MCP（Model Context Protocol）
+
+AI モデルと外部ツール・データソース間の通信に使用するオープン標準プロトコル。
+各エージェントがデータベース、ファイルシステム、外部 API 等のリソースにアクセスする際のインターフェースを標準化する。
+詳細: [docs/observability-guide.md](docs/observability-guide.md)
+
+### A2A（Agent2Agent Protocol）
+
+複数のエージェントフレームワークやベンダー間でエージェントが協調する際に使用するオープン標準プロトコル。
+現時点では設計テンプレートのみ提供（`docs/a2a-design/`）。
+実装への移行は各プロジェクトの要件に応じて判断すること。
+詳細: [docs/a2a-design/README.md](docs/a2a-design/README.md)
+
 ## ライセンス
 
 MIT License
