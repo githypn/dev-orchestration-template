@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -31,7 +30,14 @@ SCAN_DIRS = [
 SCAN_EXTENSIONS = {".py", ".ts", ".js", ".go", ".rs", ".toml", ".txt", ".yml", ".yaml"}
 
 # スキップするディレクトリ名
-SKIP_DIR_NAMES = {"__pycache__", ".git", "node_modules", ".mypy_cache", ".ruff_cache", "target"}
+SKIP_DIR_NAMES = {
+    "__pycache__",
+    ".git",
+    "node_modules",
+    ".mypy_cache",
+    ".ruff_cache",
+    "target",
+}
 
 # ホワイトリスト（パスの相対表記）— 誤検知を除外するファイル
 SKIP_FILES: set[str] = {
@@ -53,10 +59,10 @@ FORBIDDEN_IMPORT_PATTERNS: list[str] = [
 
 # 秘密情報パターン（正規表現、全ファイル種別に適用）
 SECRET_PATTERNS: list[str] = [
-    r"AKIA[0-9A-Z]{16}",                          # AWS Access Key ID
+    r"AKIA[0-9A-Z]{16}",  # AWS Access Key ID
     r"-----BEGIN\s+(RSA|DSA|EC|OPENSSH)\s+PRIVATE\s+KEY-----",  # SSH 秘密鍵
-    r"ghp_[A-Za-z0-9_]{36,}",                     # GitHub Personal Access Token
-    r"sk-[A-Za-z0-9]{32,}",                        # 汎用 API キー
+    r"ghp_[A-Za-z0-9_]{36,}",  # GitHub Personal Access Token
+    r"sk-[A-Za-z0-9]{32,}",  # 汎用 API キー
 ]
 
 # URL パターン（コード中の外部 URL 直書きを検出）
@@ -72,6 +78,7 @@ URL_ALLOWLIST_PATTERNS: list[str] = [
     r"schemas\.openapi",
     r"json-schema\.org",
     r"astral\.sh",
+    r"opentelemetry\.io",
 ]
 
 # 禁止操作パターン（言語非依存、全ファイルに適用）
@@ -133,10 +140,9 @@ def is_code_file(path: Path) -> bool:
 def is_comment_line(line: str, suffix: str) -> bool:
     """コメント行か判定する。"""
     stripped = line.lstrip()
-    if suffix in {".py", ".ts", ".js", ".go", ".rs"}:
-        if stripped.startswith("#") or stripped.startswith("//"):
-            return True
-    return False
+    return suffix in {".py", ".ts", ".js", ".go", ".rs"} and (
+        stripped.startswith("#") or stripped.startswith("//")
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,14 @@ src/{{PACKAGE_NAME}}/
 ├─ domain/        ドメインロジック
 ```
 
+テンプレート共通モジュール（`src/` 直下）:
+
+```
+src/
+├─ observability/  OpenTelemetry 計装（オプショナル。OTel SDK 未インストール時は no-op）
+├─ sample/         Design by Contract のサンプル実装（テンプレート参考用）
+```
+
 <!-- project-config.yml の modules に合わせてモジュールを追加する -->
 
 ### core/
@@ -41,10 +49,12 @@ src/{{PACKAGE_NAME}}/
 
 ## 依存ルール
 
-| モジュール | 依存してよい     | 依存禁止          |
-| ---------- | ---------------- | ----------------- |
-| core       | （なし：最下層） | 他の全モジュール  |
-| domain     | core             | <!-- 禁止対象 --> |
+| モジュール     | 依存してよい     | 依存禁止          |
+| -------------- | ---------------- | ----------------- |
+| core           | （なし：最下層） | 他の全モジュール  |
+| domain         | core             | <!-- 禁止対象 --> |
+| observability  | （外部: OTel SDK） | core, domain   |
+| sample         | （なし）         | core, domain      |
 
 <!-- 必要に応じて追加 -->
 
