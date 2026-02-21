@@ -1,0 +1,57 @@
+# =============================================================================
+# pyproject.toml テンプレート
+# =============================================================================
+# このファイルは bootstrap.sh によって pyproject.toml に変換される。
+# {{PLACEHOLDER}} 形式の値は project-config.yml の設定で自動置換される。
+#
+# 使い方:
+#   1. project-config.yml を編集する
+#   2. bash scripts/bootstrap.sh を実行する
+#   3. 生成された pyproject.toml を確認する
+# =============================================================================
+
+[project]
+# {{PROJECT_NAME}}: project-config.yml の project.name に対応（ケバブケース）
+name = "{{PROJECT_NAME}}"
+version = "0.1.0"
+# {{PROJECT_DESCRIPTION}}: project-config.yml の project.description に対応
+description = "{{PROJECT_DESCRIPTION}}"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+# OpenTelemetry 計装に必要な依存ライブラリ。
+# プロジェクトで計装を有効化する場合: uv sync --extra observability
+observability = [
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# {{PACKAGE_NAME}}: project-config.yml の source.package_name に対応
+packages = ["src/{{PACKAGE_NAME}}", "src/observability"]
+
+# =============================================================================
+# 開発ツール設定
+# =============================================================================
+
+[tool.ruff]
+target-version = "py311"
+# {{SRC_DIR}}: project-config.yml の source.src_dir に対応（通常 "src"）
+src = ["{{SRC_DIR}}"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "TCH"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+# {{SRC_DIR}}: project-config.yml の source.src_dir に対応
+mypy_path = "{{SRC_DIR}}"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

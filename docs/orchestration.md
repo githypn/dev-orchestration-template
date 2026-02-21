@@ -39,33 +39,33 @@
 ```mermaid
 graph TB
     Human[👤 人間]
-    
+
     subgraph "オーケストレーション層"
         Orch[Orchestrator<br/>司令塔]
     end
-    
+
     subgraph "実装層"
         Impl[implementer<br/>コード実装]
         Test[test-engineer<br/>テスト作成・実行]
     end
-    
+
     subgraph "監査層"
         AuditSpec[auditor-spec<br/>仕様監査]
         AuditSec[auditor-security<br/>セキュリティ監査]
         AuditRel[auditor-reliability<br/>信頼性監査]
     end
-    
+
     subgraph "リリース判定層"
         RM[release-manager<br/>リリース判定]
     end
-    
+
     subgraph "外部ツール"
         Serena[Serena MCP<br/>セマンティック分析]
         CI[GitHub Actions CI<br/>静的解析・テスト]
         CopilotReview[Copilot Code Review<br/>AI コードレビュー]
         GH[GitHub API<br/>PR・Issue 管理]
     end
-    
+
     Human -->|トリガー| Orch
     Orch -->|実装委譲| Impl
     Orch -->|テスト委譲| Test
@@ -74,11 +74,11 @@ graph TB
     Orch -->|監査委譲| AuditRel
     Orch -->|ハンドオフ| RM
     RM -->|判定結果| Human
-    
+
     Impl -.->|セマンティック分析| Serena
     Orch -.->|フォールバック分析| Serena
     AuditRel -.->|検証分析| Serena
-    
+
     Orch -->|CI 実行| CI
     Orch -->|PR 作成| GH
     CopilotReview -.->|自動レビュー| GH
@@ -134,7 +134,7 @@ graph LR
     ASec[auditor-security]
     AR[auditor-reliability]
     RM[release-manager]
-    
+
     Orch -->|sub-agent| Impl
     Orch -->|sub-agent| Test
     Orch -->|sub-agent| AS
