@@ -47,10 +47,12 @@ _TRACER_NAME = "{{TRACER_NAME}}"
 _HAS_OTEL = False
 
 try:
-    from opentelemetry import trace
+    from opentelemetry import trace  # type: ignore[import-not-found]
+    # type: ignore[import-not-found]
     from opentelemetry.sdk.resources import Resource
+    # type: ignore[import-not-found]
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import (
+    from opentelemetry.sdk.trace.export import (  # type: ignore[import-not-found]
         BatchSpanProcessor,
         ConsoleSpanExporter,
     )
@@ -285,8 +287,7 @@ def trace_llm_call(
                     return result
                 except Exception as exc:
                     span.set_attribute(
-                        "gen_ai.response.finish_reason", "error"
-                    )
+                        "gen_ai.response.finish_reason", "error")
                     span.record_exception(exc)
                     raise
 
