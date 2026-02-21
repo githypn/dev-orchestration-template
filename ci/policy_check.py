@@ -27,12 +27,17 @@ SCAN_DIRS = [
 ]
 
 # スキャン対象の拡張子
-SCAN_EXTENSIONS = {".py", ".ts", ".js", ".go",
-                   ".rs", ".toml", ".txt", ".yml", ".yaml"}
+SCAN_EXTENSIONS = {".py", ".ts", ".js", ".go", ".rs", ".toml", ".txt", ".yml", ".yaml"}
 
 # スキップするディレクトリ名
-SKIP_DIR_NAMES = {"__pycache__", ".git", "node_modules",
-                  ".mypy_cache", ".ruff_cache", "target"}
+SKIP_DIR_NAMES = {
+    "__pycache__",
+    ".git",
+    "node_modules",
+    ".mypy_cache",
+    ".ruff_cache",
+    "target",
+}
 
 # ホワイトリスト（パスの相対表記）— 誤検知を除外するファイル
 SKIP_FILES: set[str] = {
@@ -191,8 +196,7 @@ def main() -> int:
     issues: list[str] = []
 
     # .env が git 管理されていないことを確認
-    tracked_files = {p.relative_to(REPO_ROOT).as_posix()
-                     for p in git_ls_files()}
+    tracked_files = {p.relative_to(REPO_ROOT).as_posix() for p in git_ls_files()}
     if ".env" in tracked_files:
         issues.append(
             "禁止: .env がリポジトリにコミットされています。削除し、gitignore 対象にしてください。"
